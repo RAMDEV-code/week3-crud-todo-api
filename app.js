@@ -1,3 +1,4 @@
+
 const express = require('express');
 const app = express();
 app.use(express.json()); // Parse JSON bodies
@@ -9,42 +10,116 @@ let todos = [
 
 // GET All – Read
 app.get('/todos', (req, res) => {
-  res.status(200).json(todos); // Send array as JSON
+  res.status(200).json(todos);
 });
 
-// POST New – Create
+// GET Active Todos – Filter !completed
+app.get('/todos/active', (req, res) => {
+  const activeTodos = todos.filter((t) => !t.completed);
+
+  res.status(200).json(activeTodos);
+});
+
+// GET Completed Todos
+app.get('/todos/completed', (req, res) => {
+  const completed = todos.filter((t) => t.completed);
+
+  res.status(200).json(completed);
+});
+
+// GET One Todo – Read by ID
+app.get('/todos/:id', (req, res) => {
+  const id = Number(req.params.id);
+
+  const todo = todos.find((t) => t.id === id);
+
+  if (!todo) {
+    return res.status(404).json({
+      message: 'Todo not found'
+    });
+  }
+
+  res.status(200).json(todo);
+});
+
+// POST New – Create with Validation
 app.post('/todos', (req, res) => {
-  const newTodo = { id: todos.length + 1, ...req.body }; // Auto-ID
+  const { task } = req.body;
+
+  // Validate task
+  if (typeof task !== 'string' || !task.trim()) {
+    return res.status(400).json({
+      error: 'Task is required and must be a non-empty string'
+    });
+  }
+
+  const newTodo = {
+    id: todos.length
+      ? Math.max(...todos.map((t) => t.id)) + 1
+      : 1,
+    task: task.trim(),
+    completed: false
+  };
+
   todos.push(newTodo);
-  res.status(201).json(newTodo); // Echo back
+
+  res.status(201).json(newTodo);
 });
 
 // PATCH Update – Partial
 app.patch('/todos/:id', (req, res) => {
-  const todo = todos.find((t) => t.id === parseInt(req.params.id)); // Array.find()
-  if (!todo) return res.status(404).json({ message: 'Todo not found' });
-  Object.assign(todo, req.body); // Merge: e.g., {completed: true}
+  const id = Number(req.params.id);
+
+  const todo = todos.find((t) => t.id === id);
+
+  if (!todo) {
+    return res.status(404).json({
+      message: 'Todo not found'
+    });
+  }
+
+  // Validate task if included in update
+  if (
+    'task' in req.body &&
+    (typeof req.body.task !== 'string' ||
+      !req.body.task.trim())
+  ) {
+    return res.status(400).json({
+      error: 'Task must be a non-empty string'
+    });
+  }
+
+  Object.assign(todo, req.body);
+
   res.status(200).json(todo);
 });
 
 // DELETE Remove
 app.delete('/todos/:id', (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = Number(req.params.id);
+
   const initialLength = todos.length;
-  todos = todos.filter((t) => t.id !== id); // Array.filter() – non-destructive
-  if (todos.length === initialLength)
-    return res.status(404).json({ error: 'Not found' });
-  res.status(204).send(); // Silent success
+
+  todos = todos.filter((t) => t.id !== id);
+
+  if (todos.length === initialLength) {
+    return res.status(404).json({
+      error: 'Not found'
+    });
+  }
+
+  res.status(204).send();
 });
 
-app.get('/todos/completed', (req, res) => {
-  const completed = todos.filter((t) => t.completed);
-  res.json(completed); // Custom Read!
-});
-
+// Error-handling Middleware
 app.use((err, req, res, next) => {
-  res.status(500).json({ error: 'Server error!' });
+  res.status(500).json({
+    error: 'Server error!'
+  });
 });
 
 const PORT = 3002;
-app.listen(PORT, () => console.log(`Server on port ${PORT}`));
+
+app.listen(PORT, () => {
+  console.log(`Server on port ${PORT}`);
+});
